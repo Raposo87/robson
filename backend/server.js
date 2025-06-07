@@ -1,34 +1,34 @@
 // my-surf-backend/server.js
-require('dotenv').config(); // Carrega variáveis de ambiente do .env
+require('dotenv').config();
 
 const express = require('express');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const bodyParser = require('body-parser');
-const cors = require('cors'); // Para permitir requisições do seu frontend (domínios diferentes)
+const cors = require('cors');
+const nodemailer = require('nodemailer'); // Importe o Nodemailer
 
 const app = express();
-const PORT = process.env.PORT || 3001; // Usaremos a porta 3001 para o backend
+const PORT = process.env.PORT || 3001;
 
-// Configuração do CORS para permitir requisições do seu frontend local
-// Em produção, você deve restringir 'origin' ao domínio do seu site
 app.use(cors({
-    origin: 'http://127.0.0.1:5500' // Ou o endereço do seu servidor local (ex: Live Server)
+    origin: 'http://127.0.0.1:5500' // Ou o endereço do seu servidor local
 }));
+app.use(express.json());
 
-app.use(express.json()); // Garante que o req.body será populado com JSON
+// Configuração do Nodemailer
+const transporter = nodemailer.createTransport({
+    host: process.env.EMAIL_SERVICE_HOST,
+    port: parseInt(process.env.EMAIL_SERVICE_PORT),
+    secure: process.env.EMAIL_SERVICE_SECURE === 'true', // true para porta 465, false para outras como 587
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+    },
+});
 
-// Endpoint para criar a sessão de checkout do Stripe
+// Endpoint para criar a sessão de checkout do Stripe (sem mudanças aqui para emails)
 app.post('/api/create-checkout-session', async (req, res) => {
     const { nome, email, telefone, participantes, data, horario, descricao, preco } = req.body;
-
-    console.log('Recebido pedido de agendamento:', { descricao, preco, nome, email, data, horario });
-
-    // TODO: Em um sistema real, você faria as seguintes verificações:
-    // 1. Validar se todos os campos necessários foram enviados.
-    // 2. Verificar a disponibilidade da aula para a data e horário selecionados no seu banco de dados.
-    // 3. Salvar um registro provisório do agendamento no seu DB com status 'pendente'.
-
-    // O preço do frontend é em euros, precisamos convertê-lo para centavos para o Stripe.
     const precoEmCentavos = Math.round(parseFloat(preco) * 100);
 
     try {
@@ -37,7 +37,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
             line_items: [
                 {
                     price_data: {
-                        currency: 'eur', // Moeda em Euros
+                        currency: 'eur',
                         product_data: {
                             name: descricao,
                             description: `Agendamento para ${participantes} participante(s) em ${data} às ${horario}`,
@@ -48,21 +48,17 @@ app.post('/api/create-checkout-session', async (req, res) => {
                 },
             ],
             mode: 'payment',
-            // URLs para onde o cliente será redirecionado após o pagamento
-            // Estas URLs devem ser no seu frontend. Podemos criar uma página simples de sucesso/cancelamento.
             success_url: 'http://127.0.0.1:5500/frontend/sucesso.html?session_id={CHECKOUT_SESSION_ID}',
             cancel_url: 'http://127.0.0.1:5500/frontend/cancelado.html',
-            
-            // Metadados para associar o agendamento do Stripe ao seu sistema
             metadata: {
                 nome: nome,
-                email: email,
+                email_cliente: email, // Usar um nome diferente para evitar conflito com o 'email' do Stripe
                 telefone: telefone,
                 participantes: participantes,
                 data_agendamento: data,
                 horario_agendamento: horario,
-                // Você pode adicionar um ID de agendamento do seu DB aqui, se já o tiver criado.
-                // appointment_id: 'algum_id_do_seu_db_aqui'
+                descricao_aula: descricao, // Guardar descrição no metadata
+                preco_aula: preco // Guardar preço no metadata
             },
         });
 
@@ -74,13 +70,11 @@ app.post('/api/create-checkout-session', async (req, res) => {
 });
 
 // Endpoint para webhooks do Stripe
-// Usamos body-parser.raw para o Stripe poder verificar a assinatura do webhook
-app.post('/api/webhook', bodyParser.raw({ type: 'application/json' }), (req, res) => {
+app.post('/api/webhook', bodyParser.raw({ type: 'application/json' }), async (req, res) => { // Adicionado 'async'
     const sig = req.headers['stripe-signature'];
     let event;
 
     try {
-        // Certifique-se de que process.env.STRIPE_WEBHOOK_SECRET está configurado
         event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
     } catch (err) {
         console.error(`Webhook Error: ${err.message}`);
@@ -93,32 +87,92 @@ app.post('/api/webhook', bodyParser.raw({ type: 'application/json' }), (req, res
             const session = event.data.object;
             console.log('--- Checkout Session Completed! ---');
             console.log('Session ID:', session.id);
-            console.log('Customer Email:', session.customer_details ? session.customer_details.email : 'N/A');
+            console.log('Customer Email (Stripe):', session.customer_details ? session.customer_details.email : 'N/A');
             console.log('Metadata:', session.metadata);
 
+            // Extrair dados do metadata
+            const {
+                nome,
+                email_cliente, // Usar o nome que você definiu no metadata
+                telefone,
+                participantes,
+                data_agendamento,
+                horario_agendamento,
+                descricao_aula,
+                preco_aula
+            } = session.metadata;
+
             // TODO: Aqui é onde você atualizaria o status do agendamento no seu banco de dados
-            // Usando session.metadata, você pode encontrar o agendamento correspondente
-            // e mudar seu status de 'pendente' para 'confirmado'.
-            // Enviar email de confirmação para o cliente, notificar o admin, etc.
+            // Ex: saveAppointmentToDatabase(session.id, nome, email_cliente, ...);
+
+            // --- Enviar E-mail para o Cliente ---
+            const mailOptionsCliente = {
+                from: process.env.EMAIL_USER, // Seu e-mail de envio
+                to: email_cliente,           // E-mail do cliente
+                subject: 'Confirmação do seu Agendamento na Surf Wave Lisboa',
+                html: `
+                    <h1>Olá, ${nome}!</h1>
+                    <p>Seu agendamento para a aula de **${descricao_aula}** foi confirmado com sucesso!</p>
+                    <p>Detalhes do Agendamento:</p>
+                    <ul>
+                        <li>**Data:** ${data_agendamento}</li>
+                        <li>**Horário:** ${horario_agendamento}</li>
+                        <li>**Aula:** ${descricao_aula}</li>
+                        <li>**Participantes:** ${participantes}</li>
+                        <li>**Preço Total:** €${parseFloat(preco_aula).toFixed(2)}</li>
+                    </ul>
+                    <p>Aguardamos você para uma ótima sessão de surf!</p>
+                    <p>Atenciosamente,<br>Equipe Surf Wave Lisboa</p>
+                    <p><small>Este é um e-mail automático, por favor não responda.</small></p>
+                `,
+            };
+
+            try {
+                await transporter.sendMail(mailOptionsCliente);
+                console.log('E-mail de confirmação enviado para o cliente:', email_cliente);
+            } catch (mailError) {
+                console.error('Erro ao enviar e-mail para o cliente:', mailError);
+            }
+
+            // --- Enviar E-mail para o Administrador ---
+            const mailOptionsAdmin = {
+                from: process.env.EMAIL_USER,       // Seu e-mail de envio
+                to: 'email_do_dono@example.com', // <<<<< Mude para o e-mail do dono/administrador
+                subject: 'NOVO AGENDAMENTO: Surf Wave Lisboa',
+                html: `
+                    <h1>Novo Agendamento Recebido!</h1>
+                    <p>Detalhes da Nova Reserva:</p>
+                    <ul>
+                        <li>**Nome do Cliente:** ${nome}</li>
+                        <li>**Email do Cliente:** ${email_cliente}</li>
+                        <li>**Telefone do Cliente:** ${telefone}</li>
+                        <li>**Aula Reservada:** ${descricao_aula}</li>
+                        <li>**Data:** ${data_agendamento}</li>
+                        <li>**Horário:** ${horario_agendamento}</li>
+                        <li>**Participantes:** ${participantes}</li>
+                        <li>**Valor Pago:** €${parseFloat(preco_aula).toFixed(2)}</li>
+                        <li>**ID da Sessão Stripe:** ${session.id}</li>
+                    </ul>
+                    <p>Acesse seu painel do Stripe para mais detalhes sobre o pagamento.</p>
+                `,
+            };
+
+            try {
+                await transporter.sendMail(mailOptionsAdmin);
+                console.log('E-mail de notificação enviado para o administrador.');
+            } catch (mailError) {
+                console.error('Erro ao enviar e-mail para o administrador:', mailError);
+            }
 
             break;
-        case 'payment_intent.succeeded':
-            const paymentIntent = event.data.object;
-            console.log('--- Payment Intent Succeeded! ---');
-            console.log('Payment Intent ID:', paymentIntent.id);
-            // Este evento é mais granular, pode ser usado para atualizações de pagamento
-            // dependendo do seu fluxo, mas 'checkout.session.completed' é geralmente suficiente para o Checkout.
-            break;
-        // Adicione outros eventos conforme necessário (ex: payment_intent.payment_failed)
+        // Adicione outros eventos conforme necessário
         default:
             console.log(`Unhandled event type ${event.type}`);
     }
 
-    // Retorne uma resposta 200 para o Stripe
     res.json({ received: true });
 });
 
-// Inicia o servidor
 app.listen(PORT, () => {
     console.log(`Backend rodando em http://localhost:${PORT}`);
 });
