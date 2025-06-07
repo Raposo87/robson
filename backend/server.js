@@ -50,8 +50,8 @@ app.post('/api/create-checkout-session', async (req, res) => {
             mode: 'payment',
             // URLs para onde o cliente será redirecionado após o pagamento
             // Estas URLs devem ser no seu frontend. Podemos criar uma página simples de sucesso/cancelamento.
-            success_url: 'http://127.0.0.1:5500/sucesso.html?session_id={CHECKOUT_SESSION_ID}', // Adapte para o seu frontend
-            cancel_url: 'http://127.0.0.1:5500/cancelado.html', // Adapte para o seu frontend
+            success_url: 'http://127.0.0.1:5500/frontend/sucesso.html?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url: 'http://127.0.0.1:5500/frontend/cancelado.html',
             
             // Metadados para associar o agendamento do Stripe ao seu sistema
             metadata: {
