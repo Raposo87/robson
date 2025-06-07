@@ -83,7 +83,7 @@ app.post('/api/webhook', bodyParser.raw({ type: 'application/json' }), async (re
 
             const mailOptionsAdmin = {
                 from: process.env.EMAIL_USER,
-                to: 'email_do_dono@example.com', // <<<<< Mude para o e-mail do dono/administrador
+                to: 'igorraposo02@gmail.com', // <<<<< Mude para o e-mail do dono/administrador
                 subject: 'NOVO AGENDAMENTO: Surf Wave Lisboa',
                 html: `
                     <h1>Novo Agendamento Recebido!</h1>
