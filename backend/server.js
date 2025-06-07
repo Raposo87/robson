@@ -11,8 +11,15 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Configuração do CORS
+const cors = require('cors');
+
 app.use(cors({
-    origin: 'https://satisfied-rejoicing-production-0f56.up.railway.app/'
+    origin: [
+        'http://localhost:3000', // Para desenvolvimento local
+        'https://satisfied-rejoicing-production-0f56.up.railway.app', // Seu novo frontend
+        // Adicione outros domínios se necessário
+    ],
+    credentials: true
 }));
 
 // Configuração do Nodemailer (já está ok)
