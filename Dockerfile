@@ -5,7 +5,8 @@ FROM node:18-alpine
 WORKDIR /app
 
 # Copie o package.json para o diretório backend
-COPY package.json ./backend/
+COPY backend/package.json ./backend/
+COPY backend/package-lock.json ./backend/
 
 # Mude para o diretório backend e instale as dependências
 WORKDIR /app/backend
