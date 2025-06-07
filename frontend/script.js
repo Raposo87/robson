@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', function() {
       document.getElementById('mensagem-agendamento').style.display = 'block';
 
       try {
-          const response = await fetch('http://localhost:3001/api/create-checkout-session', { // Endereço do seu backend local
+          const response = await fetch('robson-production.up.railway.app', { // Endereço do seu backend local
               method: 'POST',
               headers: {
                   'Content-Type': 'application/json'
