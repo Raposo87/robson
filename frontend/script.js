@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', function() {
       document.getElementById('mensagem-agendamento').style.display = 'block';
 
       try {
-          const response = await fetch('robson-production.up.railway.app', { // Endereço do seu backend local
+          const response = await fetch('https://robson-production.up.railway.app', { // Endereço do seu backend local
               method: 'POST',
               headers: {
                   'Content-Type': 'application/json'
