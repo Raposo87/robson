@@ -15,6 +15,8 @@ app.use(cors({
     origin: 'http://127.0.0.1:5500' // Ou o endereço do seu servidor local (ex: Live Server)
 }));
 
+app.use(express.json()); // Garante que o req.body será populado com JSON
+
 // Endpoint para criar a sessão de checkout do Stripe
 app.post('/api/create-checkout-session', async (req, res) => {
     const { nome, email, telefone, participantes, data, horario, descricao, preco } = req.body;
