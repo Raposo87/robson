@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3001;
 
 // Configuração do CORS
 app.use(cors({
-    origin: 'http://127.0.0.1:5500'
+    origin: 'https://satisfied-rejoicing-production-0f56.up.railway.app/'
 }));
 
 // Configuração do Nodemailer (já está ok)
