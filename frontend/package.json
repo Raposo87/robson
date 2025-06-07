@@ -1,0 +1,13 @@
+{
+  "name": "surf-wave-lisboa",
+  "version": "1.0.0",
+  "description": "Site da Surf Wave Lisboa",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve -s . -p $PORT",
+    "build": "echo 'No build needed for static site'"
+  },
+  "dependencies": {
+    "serve": "^14.2.1"
+  }
+}
